@@ -19,6 +19,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const webhookSecret = process.env.DODO_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("Critical: DODO_WEBHOOK_SECRET is not configured on server.");
+      return NextResponse.json(
+        { error: "Webhook secret is not configured on the server." },
+        { status: 500 }
+      );
+    }
+
     // 2. Read the raw text payload body
     const rawBody = await request.text();
 
@@ -31,7 +40,7 @@ export async function POST(request: NextRequest) {
           "webhook-signature": signature,
           "webhook-timestamp": timestamp,
         },
-        key: process.env.DODO_WEBHOOK_SECRET,
+        key: webhookSecret,
       });
     } catch (err: any) {
       console.error("Cryptographic signature verification failed for Dodo Payments Webhook:", err);
@@ -93,18 +102,23 @@ export async function POST(request: NextRequest) {
           userPlan = "starter";
         }
 
-        console.log(`Upgrading user ${userId} to ${userPlan} plan (product_id: ${productId}).`);
-        
+        // Strictly ensure status is active before upgrading plan
+        const isActive = status === "active";
+
         // Transaction to ensure atomic consistency
         await db.transaction(async (tx) => {
-          // A. Set user plan
-          await tx
-            .update(user)
-            .set({ plan: userPlan })
-            .where(eq(user.id, userId));
+          if (isActive) {
+            console.log(`Upgrading user ${userId} to ${userPlan} plan (product_id: ${productId}).`);
+            // A. Set user plan
+            await tx
+              .update(user)
+              .set({ plan: userPlan })
+              .where(eq(user.id, userId));
+          } else {
+            console.log(`Subscription event ${event.type} received with non-active status: ${status}. User plan not upgraded.`);
+          }
 
           // B. Upsert subscription record
-          // Try to select existing subscription record by dodoSubscriptionId
           const existingSub = await tx.query.subscriptions.findFirst({
             where: eq(subscriptions.dodoSubscriptionId, dodoSubId),
           });
@@ -113,7 +127,7 @@ export async function POST(request: NextRequest) {
             await tx
               .update(subscriptions)
               .set({
-                status: status,
+                status: status || (isActive ? "active" : "pending"),
                 currentPeriodEnd: nextBillingDate,
                 plan: userPlan,
               })
@@ -124,7 +138,7 @@ export async function POST(request: NextRequest) {
               userId: userId,
               dodoSubscriptionId: dodoSubId,
               plan: userPlan,
-              status: status,
+              status: status || (isActive ? "active" : "pending"),
               currentPeriodEnd: nextBillingDate,
             });
           }
@@ -135,8 +149,16 @@ export async function POST(request: NextRequest) {
 
       case "subscription.cancelled":
       case "subscription.expired":
+      case "subscription.on_hold":
+      case "subscription.paused":
       case "payment.failed": {
         console.log(`Downgrading user ${userId} to Free plan due to event: ${event.type}.`);
+
+        const resolvedStatus =
+          event.type === "payment.failed" ? "failed" :
+          event.type === "subscription.paused" ? "paused" :
+          event.type === "subscription.on_hold" ? "on_hold" :
+          event.type === "subscription.expired" ? "expired" : "cancelled";
 
         // Transaction to ensure atomic consistency
         await db.transaction(async (tx) => {
@@ -153,7 +175,7 @@ export async function POST(request: NextRequest) {
           await tx
             .update(subscriptions)
             .set({
-              status: event.type === "payment.failed" ? "failed" : "cancelled",
+              status: resolvedStatus,
             })
             .where(eq(subscriptions.dodoSubscriptionId, dodoSubId));
         });

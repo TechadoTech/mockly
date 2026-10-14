@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { mockups } from "@/db/schema";
-import { and, eq, gte } from "drizzle-orm";
+import { user as userTable, mockups, subscriptions, exportLogs } from "@/db/schema";
+import { and, eq, gte, desc } from "drizzle-orm";
 import { imagekit } from "@/lib/imagekit";
 import satori from "satori";
 import sharp from "sharp";
@@ -19,6 +19,7 @@ const BACKEND_BG_STYLES = {
   emerald: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
   cyberpunk: "linear-gradient(135deg, #f80759 0%, #bc4e9c 100%)",
   aurora: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
+  "minimal-frost": "radial-gradient(ellipse at 50% 120%, rgba(186, 230, 253, 0.5) 0%, rgba(240, 249, 255, 0.3) 45%, #ffffff 80%)",
   
   // Solids
   slate: "#334155",
@@ -55,7 +56,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { user } = session;
+    // 1.5 Fetch fresh user record directly from database (guarantees ground-truth plan and role)
+    const dbUser = await db.query.user.findFirst({
+      where: eq(userTable.id, session.user.id),
+    });
+
+    if (!dbUser) {
+      return NextResponse.json(
+        { error: "User account not found." },
+        { status: 404 }
+      );
+    }
+
+    const user = dbUser;
+
+    // 1.6 Verify active subscription status if marked as paid
+    let effectivePlan: "free" | "starter" | "pro" = (user.plan as any) || "free";
+
+    if (effectivePlan !== "free" && user.role !== "admin") {
+      const latestSub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.userId, user.id),
+        orderBy: [desc(subscriptions.createdAt)],
+      });
+
+      if (!latestSub) {
+        effectivePlan = "free";
+        await db.update(userTable).set({ plan: "free" }).where(eq(userTable.id, user.id));
+      } else if (
+        (latestSub.status === "cancelled" || latestSub.status === "failed" || latestSub.status === "expired" || latestSub.status === "pending_cancellation" || latestSub.status === "on_hold" || latestSub.status === "paused") &&
+        latestSub.currentPeriodEnd &&
+        new Date(latestSub.currentPeriodEnd) < new Date()
+      ) {
+        effectivePlan = "free";
+        await db.update(userTable).set({ plan: "free" }).where(eq(userTable.id, user.id));
+      } else if (latestSub.status !== "active" && latestSub.status !== "pending_cancellation") {
+        effectivePlan = "free";
+        await db.update(userTable).set({ plan: "free" }).where(eq(userTable.id, user.id));
+      }
+    }
 
     // 2. Parse request payload
     const body = await request.json();
@@ -66,10 +104,13 @@ export async function POST(request: NextRequest) {
       shadowIntensity, 
       paddingLevel, 
       textOverlay, 
+      textAccent,
+      textAccentColor,
       textPosition, 
       textFontSize,
       textColor,
       textWeight,
+      aspectRatio,
       nodes,
       // Legacy backward compatibility parameters
       screenshotUrl,
@@ -124,12 +165,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 2.5 Enforce maximum screens allowed per mockup based on plan
+    const maxAllowedScreens = (effectivePlan === "pro" || user.role === "admin") ? 7 : 3;
+    if (canvasNodes.length > maxAllowedScreens) {
+      return NextResponse.json(
+        { 
+          error: `Screen limit exceeded: Your ${effectivePlan} plan allows up to ${maxAllowedScreens} screens per mockup. Upgrade to Pro for up to 7 screens.` 
+        },
+        { status: 403 }
+      );
+    }
+
     // 3. Enforce monthly export quota (Free: 5 exports/mo, Starter: 30 exports/mo, Pro: Unlimited)
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const monthExports = await db
+    const monthExportLogs = await db
+      .select()
+      .from(exportLogs)
+      .where(
+        and(
+          eq(exportLogs.userId, user.id),
+          gte(exportLogs.createdAt, startOfMonth)
+        )
+      );
+
+    const monthMockups = await db
       .select()
       .from(mockups)
       .where(
@@ -139,11 +201,13 @@ export async function POST(request: NextRequest) {
         )
       );
 
-    const exportLimit = user.plan === "free" ? 5 : user.plan === "starter" ? 30 : Infinity;
+    // Use maximum of permanent export logs and current month mockups (prevents delete trick)
+    const currentMonthUsage = Math.max(monthExportLogs.length, monthMockups.length);
+    const exportLimit = effectivePlan === "free" ? 5 : effectivePlan === "starter" ? 30 : Infinity;
 
-    if (user.role !== "admin" && monthExports.length >= exportLimit) {
+    if (user.role !== "admin" && currentMonthUsage >= exportLimit) {
       return NextResponse.json(
-        { error: `Export limit reached for your ${user.plan} plan. Please upgrade to a higher tier to unlock more exports.` },
+        { error: `Export limit reached: You have used ${currentMonthUsage}/${exportLimit} monthly exports on your ${effectivePlan} plan. Upgrade to unlock more exports.` },
         { status: 403 }
       );
     }
@@ -175,6 +239,17 @@ export async function POST(request: NextRequest) {
       try {
         if (!node.screenshotUrl) {
           return { ...node, base64: null };
+        }
+        if (typeof node.screenshotUrl === "string" && node.screenshotUrl.startsWith("/")) {
+          const localFilePath = path.join(process.cwd(), "public", node.screenshotUrl);
+          try {
+            const fileBuf = await fs.readFile(localFilePath);
+            const isJpg = node.screenshotUrl.endsWith(".jpg") || node.screenshotUrl.endsWith(".jpeg");
+            const base64 = `data:${isJpg ? "image/jpeg" : "image/png"};base64,${fileBuf.toString("base64")}`;
+            return { ...node, base64 };
+          } catch (err) {
+            console.error(`Failed to read local file: ${localFilePath}`, err);
+          }
         }
         const imgRes = await fetch(node.screenshotUrl);
         if (!imgRes.ok) {
@@ -258,19 +333,19 @@ export async function POST(request: NextRequest) {
 
     // Account for text overlay space requirements
     let textSpace = 0;
-    if (textOverlay) {
-      textSpace = (textFontSize || 32) * 1.5 + 24;
+    if (textOverlay || textAccent) {
+      textSpace = (textFontSize || 32) * (textAccent ? 2.5 : 1.5) + 32;
     }
 
-    const paddingTop = paddingValue + (textOverlay && textPosition === "Top" ? textSpace : 0);
-    const paddingBottom = paddingValue + (textOverlay && textPosition === "Bottom" ? textSpace : 0);
+    const paddingTop = paddingValue + ((textOverlay || textAccent) && textPosition === "Top" ? textSpace : 0);
+    const paddingBottom = paddingValue + ((textOverlay || textAccent) && textPosition === "Bottom" ? textSpace : 0);
     const paddingLeft = paddingValue;
     const paddingRight = paddingValue;
 
     const exportWidth = Math.round(contentWidth + paddingLeft + paddingRight);
     const exportHeight = Math.round(contentHeight + paddingTop + paddingBottom);
 
-    const isBgLight = background === "white" || background === "candy" || isLightColor(customBgColor);
+    const isBgLight = background === "white" || background === "candy" || background === "minimal-frost" || isLightColor(customBgColor);
 
     console.log("[Export Server Debug] exportWidth:", exportWidth, "exportHeight:", exportHeight);
     console.log("[Export Server Debug] fetchedNodes count:", fetchedNodes.length);
@@ -323,7 +398,7 @@ export async function POST(request: NextRequest) {
         </div>
 
         {/* Global Typography Headline Overlay */}
-        {textOverlay && (
+        {(textOverlay || textAccent) && (
           <div
             style={{
               position: "absolute",
@@ -332,22 +407,40 @@ export async function POST(request: NextRequest) {
               top: textPosition === "Top" ? `${paddingValue}px` : "auto",
               bottom: textPosition === "Bottom" ? `${paddingValue}px` : "auto",
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               zIndex: 40,
             }}
           >
-            <span
-              style={{
-                fontSize: textFontSize ? `${textFontSize}px` : "32px",
-                fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
-                color: textColor || (isBgLight ? "#000000" : "#ffffff"),
-                textShadow: "0 2px 10px rgba(0, 0, 0, 0.2)",
-                letterSpacing: "-0.5px",
-              }}
-            >
-              {textOverlay}
-            </span>
+            {textAccent && (
+              <span
+                style={{
+                  fontSize: textFontSize ? `${Math.round(textFontSize * 0.9)}px` : "30px",
+                  fontWeight: 800,
+                  color: textAccentColor || "#f97316",
+                  letterSpacing: "-0.5px",
+                  marginBottom: "4px",
+                  textAlign: "center",
+                }}
+              >
+                {textAccent}
+              </span>
+            )}
+            {textOverlay && (
+              <span
+                style={{
+                  fontSize: textFontSize ? `${textFontSize}px` : "32px",
+                  fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
+                  color: textColor || (isBgLight ? "#000000" : "#ffffff"),
+                  textShadow: isBgLight ? "none" : "0 2px 10px rgba(0, 0, 0, 0.2)",
+                  letterSpacing: "-0.5px",
+                  textAlign: "center",
+                }}
+              >
+                {textOverlay}
+              </span>
+            )}
           </div>
         )}
 
@@ -402,10 +495,10 @@ export async function POST(request: NextRequest) {
             }
 
             // Combined drop shadow with light catch chamfer
-            let shadowStyle = "0px 20px 30px rgba(0, 0, 0, 0.35)";
+            let shadowStyle = isBgLight ? "0px 20px 35px rgba(0, 0, 0, 0.16)" : "0px 20px 30px rgba(0, 0, 0, 0.35)";
             if (shadowIntensity === "None") shadowStyle = "";
-            else if (shadowIntensity === "Soft") shadowStyle = "0px 15px 35px rgba(0, 0, 0, 0.25)";
-            else if (shadowIntensity === "Dramatic") shadowStyle = "0px 30px 60px rgba(0, 0, 0, 0.55)";
+            else if (shadowIntensity === "Soft") shadowStyle = isBgLight ? "0px 15px 35px rgba(0, 0, 0, 0.12)" : "0px 15px 35px rgba(0, 0, 0, 0.25)";
+            else if (shadowIntensity === "Dramatic") shadowStyle = isBgLight ? "0px 30px 60px rgba(0, 0, 0, 0.24)" : "0px 30px 60px rgba(0, 0, 0, 0.55)";
 
             // Combine the inset light chamfer and the outer drop shadow in Satori
             const combinedBoxShadow = shadowStyle 
@@ -413,6 +506,7 @@ export async function POST(request: NextRequest) {
               : lightChamferVal;
 
             const renderDeviceFeature = () => {
+              if (node.showIsland === false) return null;
               if (
                 node.deviceFrame === "iPhone 17 Pro" ||
                 node.deviceFrame === "iPhone 16 Pro" ||
@@ -425,8 +519,10 @@ export async function POST(request: NextRequest) {
                       top: "8px",
                       left: "50%",
                       transform: "translateX(-50%)",
-                      width: "42%",
-                      height: "15px",
+                      width: "30%",
+                      maxWidth: "124px",
+                      minWidth: "70px",
+                      height: "14px",
                       backgroundColor: "#090a0f",
                       border: "1px solid rgba(255, 255, 255, 0.05)",
                       borderRadius: "8px",
@@ -637,7 +733,7 @@ export async function POST(request: NextRequest) {
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: (node.screenFit as any) || "cover",
                           position: "absolute",
                           zIndex: 10,
                         }}
@@ -781,7 +877,7 @@ export async function POST(request: NextRequest) {
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: (node.screenFit as any) || "cover",
                           position: "absolute",
                           zIndex: 10,
                         }}
@@ -901,7 +997,7 @@ export async function POST(request: NextRequest) {
                           style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "cover",
+                            objectFit: (node.screenFit as any) || "cover",
                             position: "absolute",
                             zIndex: 10,
                           }}
@@ -1080,7 +1176,7 @@ export async function POST(request: NextRequest) {
                           style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "cover",
+                            objectFit: (node.screenFit as any) || "cover",
                             position: "absolute",
                             zIndex: 10,
                           }}
@@ -1126,7 +1222,7 @@ export async function POST(request: NextRequest) {
           })}
         
         {/* Server Side Watermark for Free Plan users (exempting Admins) */}
-        {user.plan === "free" && user.role !== "admin" && (
+        {effectivePlan === "free" && user.role !== "admin" && (
           <div
             style={{
               position: "absolute",
@@ -1220,6 +1316,13 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
       })
       .returning();
+
+    // 9.5 Record permanent export event for quota enforcement (tamper-proof against mockup deletion)
+    await db.insert(exportLogs).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      createdAt: new Date(),
+    });
 
     // 10. Return completed record
     return NextResponse.json({

@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 
 // Background Preset Definitions
 export const BACKGROUND_PRESETS = [
+  { id: "minimal-frost", name: "App Store Studio", style: "radial-gradient(ellipse at 50% 120%, rgba(186, 230, 253, 0.5) 0%, rgba(240, 249, 255, 0.3) 45%, #ffffff 80%)" },
   { id: "sunset", name: "Sunset Glow", style: "linear-gradient(135deg, #ff5e62 0%, #ff9966 100%)" },
   { id: "ocean", name: "Ocean Breeze", style: "linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)" },
   { id: "lavender", name: "Midnight Lavender", style: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
@@ -39,6 +40,16 @@ export const BACKGROUND_PRESETS = [
   { id: "forest", name: "Forest Sunset Mesh", style: "radial-gradient(at 20% 0%, rgba(251, 146, 60, 0.5) 0px, transparent 50%), radial-gradient(at 80% 100%, rgba(16, 185, 129, 0.4) 0px, transparent 50%), #0d1e1a" }
 ];
 
+export const getBoardDimensions = (aspectRatio?: "16:9" | "9:16" | "1:1") => {
+  if (aspectRatio === "9:16") {
+    return { width: 675, height: 1200 };
+  }
+  if (aspectRatio === "1:1") {
+    return { width: 1000, height: 1000 };
+  }
+  return { width: 1200, height: 675 };
+};
+
 export const DEVICE_FRAMES = [
   // Desktop & Web
   { id: "MacBook Pro", name: "MacBook Pro 16\"", category: "Desktop" },
@@ -58,6 +69,13 @@ export const DEVICE_FRAMES = [
 
 export const isDesktopFrame = (frameId?: string | null) => {
   return frameId === "MacBook Pro" || frameId === "Safari Browser" || frameId === "Chrome Browser";
+};
+
+export const getFrameBezels = (deviceFrame?: string | null) => {
+  if (deviceFrame === "Safari Browser") return { w: 2, h: 34 };
+  if (deviceFrame === "Chrome Browser") return { w: 2, h: 58 };
+  if (deviceFrame === "MacBook Pro") return { w: 10, h: 22 };
+  return { w: 23, h: 23 }; // mobile frames (8px border * 2 + 3.5px padding * 2 = 23px)
 };
 
 export const FRAME_COLORS = [
@@ -99,11 +117,13 @@ function MockupScreenMedia({
   embedUrl,
   screenshotUrl,
   interactive,
+  screenFit = "cover",
 }: {
   isEmbed?: boolean;
   embedUrl?: string;
   screenshotUrl?: string;
   interactive?: boolean;
+  screenFit?: "cover" | "contain" | "fill";
 }) {
   if (isEmbed && embedUrl) {
     return (
@@ -118,11 +138,17 @@ function MockupScreenMedia({
     );
   }
   if (screenshotUrl) {
+    const objectFitClass =
+      screenFit === "contain"
+        ? "object-contain"
+        : screenFit === "fill"
+        ? "object-fill"
+        : "object-cover";
     return (
       <img
         src={screenshotUrl}
         alt="Screenshot Preview"
-        className="w-full h-full object-cover select-none pointer-events-none z-10"
+        className={`w-full h-full ${objectFitClass} select-none pointer-events-none z-10`}
       />
     );
   }
@@ -245,6 +271,7 @@ function CustomDeviceNode({ id, data, selected }: any) {
               embedUrl={data.embedUrl}
               screenshotUrl={data.screenshotUrl}
               interactive={data.interactive}
+              screenFit={data.screenFit}
             />
             {!data.interactive && (
               <div 
@@ -306,6 +333,7 @@ function CustomDeviceNode({ id, data, selected }: any) {
               embedUrl={data.embedUrl}
               screenshotUrl={data.screenshotUrl}
               interactive={data.interactive}
+              screenFit={data.screenFit}
             />
             {!data.interactive && (
               <div 
@@ -348,6 +376,7 @@ function CustomDeviceNode({ id, data, selected }: any) {
                 embedUrl={data.embedUrl}
                 screenshotUrl={data.screenshotUrl}
                 interactive={data.interactive}
+                screenFit={data.screenFit}
               />
               {!data.interactive && (
                 <div 
@@ -394,8 +423,8 @@ function CustomDeviceNode({ id, data, selected }: any) {
         />
 
         {/* Notch dynamic layouts with glass lens reflections */}
-        {(data.deviceFrame === "iPhone 17 Pro" || data.deviceFrame === "iPhone 16 Pro" || data.deviceFrame === "iPhone 15 Pro") && (
-          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[42%] h-[15px] bg-[#090a0f] border border-white/5 rounded-full z-30 flex items-center justify-center">
+        {(data.showIsland !== false) && (data.deviceFrame === "iPhone 17 Pro" || data.deviceFrame === "iPhone 16 Pro" || data.deviceFrame === "iPhone 15 Pro") && (
+          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[30%] max-w-[124px] min-w-[70px] h-[14px] bg-[#090a0f] border border-white/5 rounded-full z-30 flex items-center justify-center">
             {/* Camera Lens Reflection */}
             <span 
               className="w-1.5 h-1.5 rounded-full absolute right-[25%] shadow-inner flex items-center justify-center" 
@@ -411,13 +440,13 @@ function CustomDeviceNode({ id, data, selected }: any) {
           </div>
         )}
 
-        {(data.deviceFrame === "iPhone 14" || data.deviceFrame === "iPhone 13") && (
+        {(data.showIsland !== false) && (data.deviceFrame === "iPhone 14" || data.deviceFrame === "iPhone 13") && (
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[52%] h-[18px] bg-[#090a0f] border-x border-b border-white/5 rounded-b-[10px] z-30 flex items-center justify-center">
             <span className="w-[45%] h-[2px] bg-[#222] rounded-full absolute top-[3px]" />
           </div>
         )}
 
-        {data.deviceFrame === "Google Pixel 9 Pro" && (
+        {(data.showIsland !== false) && data.deviceFrame === "Google Pixel 9 Pro" && (
           <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] bg-[#090a0f] rounded-full z-30 border border-white/5 flex items-center justify-center">
             <span 
               className="w-1.5 h-1.5 rounded-full shadow-inner flex items-center justify-center"
@@ -431,11 +460,11 @@ function CustomDeviceNode({ id, data, selected }: any) {
           </div>
         )}
 
-        {data.deviceFrame === "Samsung Galaxy S24" && (
+        {(data.showIsland !== false) && data.deviceFrame === "Samsung Galaxy S24" && (
           <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-[#000] rounded-full z-30 border border-white/5 flex items-center justify-center" />
         )}
 
-        {data.deviceFrame === "Sony Xperia 1 VI" && (
+        {(data.showIsland !== false) && data.deviceFrame === "Sony Xperia 1 VI" && (
           <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[8px] h-[8px] bg-[#000] rounded-full z-30 border border-white/5 flex items-center justify-center" />
         )}
 
@@ -450,6 +479,7 @@ function CustomDeviceNode({ id, data, selected }: any) {
               embedUrl={data.embedUrl}
               screenshotUrl={data.screenshotUrl}
               interactive={data.interactive}
+              screenFit={data.screenFit}
             />
             {!data.interactive && (
               <div 
@@ -614,11 +644,13 @@ function StaticDeviceMockup({ node, shadowIntensity }: { node: any; shadowIntens
 
   const renderStaticScreen = () => {
     if (screenshotUrl) {
+      const fit = data.screenFit || node.screenFit || "cover";
+      const fitClass = fit === "contain" ? "object-contain" : fit === "fill" ? "object-fill" : "object-cover";
       return (
         <img 
           src={screenshotUrl} 
           alt="Screenshot Preview" 
-          className="w-full h-full object-cover select-none pointer-events-none z-10" 
+          className={`w-full h-full ${fitClass} select-none pointer-events-none z-10`} 
         />
       );
     }
@@ -747,8 +779,8 @@ function StaticDeviceMockup({ node, shadowIntensity }: { node: any; shadowIntens
         />
 
         {/* Notch dynamic layouts with glass lens reflections */}
-        {(deviceFrame === "iPhone 17 Pro" || deviceFrame === "iPhone 16 Pro" || deviceFrame === "iPhone 15 Pro") && (
-          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[42%] h-[15px] bg-[#090a0f] border border-white/5 rounded-full z-30 flex items-center justify-center">
+        {(data.showIsland !== false && node.showIsland !== false) && (deviceFrame === "iPhone 17 Pro" || deviceFrame === "iPhone 16 Pro" || deviceFrame === "iPhone 15 Pro") && (
+          <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[30%] max-w-[124px] min-w-[70px] h-[14px] bg-[#090a0f] border border-white/5 rounded-full z-30 flex items-center justify-center">
             <span 
               className="w-1.5 h-1.5 rounded-full absolute right-[25%] shadow-inner flex items-center justify-center" 
               style={{
@@ -762,13 +794,13 @@ function StaticDeviceMockup({ node, shadowIntensity }: { node: any; shadowIntens
           </div>
         )}
 
-        {(deviceFrame === "iPhone 14" || deviceFrame === "iPhone 13") && (
+        {(data.showIsland !== false && node.showIsland !== false) && (deviceFrame === "iPhone 14" || deviceFrame === "iPhone 13") && (
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[52%] h-[18px] bg-[#090a0f] border-x border-b border-white/5 rounded-b-[10px] z-30 flex items-center justify-center">
             <span className="w-[45%] h-[2px] bg-[#222] rounded-full absolute top-[3px]" />
           </div>
         )}
 
-        {deviceFrame === "Google Pixel 9 Pro" && (
+        {(data.showIsland !== false && node.showIsland !== false) && deviceFrame === "Google Pixel 9 Pro" && (
           <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[11px] h-[11px] bg-[#090a0f] rounded-full z-30 border border-white/5 flex items-center justify-center">
             <span 
               className="w-1.5 h-1.5 rounded-full shadow-inner flex items-center justify-center"
@@ -782,11 +814,11 @@ function StaticDeviceMockup({ node, shadowIntensity }: { node: any; shadowIntens
           </div>
         )}
 
-        {deviceFrame === "Samsung Galaxy S24" && (
+        {(data.showIsland !== false && node.showIsland !== false) && deviceFrame === "Samsung Galaxy S24" && (
           <div className="absolute top-[8px] left-1/2 -translate-x-1/2 w-[7px] h-[7px] bg-[#000] rounded-full z-30 border border-white/5 flex items-center justify-center" />
         )}
 
-        {deviceFrame === "Sony Xperia 1 VI" && (
+        {(data.showIsland !== false && node.showIsland !== false) && deviceFrame === "Sony Xperia 1 VI" && (
           <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[8px] h-[8px] bg-[#000] rounded-full z-30 border border-white/5 flex items-center justify-center" />
         )}
 
@@ -825,7 +857,208 @@ function StaticDeviceMockup({ node, shadowIntensity }: { node: any; shadowIntens
 
 const nodeTypes = {
   deviceMockup: CustomDeviceNode,
+  deviceNode: CustomDeviceNode,
 };
+
+interface Board {
+  id: string;
+  title: string;
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  selectedBg: string;
+  customBgColor: string;
+  shadowIntensity: "None" | "Soft" | "Dramatic";
+  paddingLevel: "Compact" | "Standard" | "Spacious";
+  textAccent?: string;
+  textAccentColor?: string;
+  textOverlay: string;
+  textPosition: "Top" | "Bottom";
+  textFontSize: number;
+  textColor: string;
+  textWeight: "normal" | "medium" | "bold" | "extrabold";
+  gridVisible: boolean;
+  gridVariant: "dots" | "lines" | "cross";
+  nodes: Node[];
+}
+
+interface CanvasSnapshot {
+  nodes: Node[];
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  selectedBg: string;
+  customBgColor: string;
+  shadowIntensity: "None" | "Soft" | "Dramatic";
+  paddingLevel: "Compact" | "Standard" | "Spacious";
+  textAccent?: string;
+  textAccentColor?: string;
+  textOverlay: string;
+  textPosition: "Top" | "Bottom";
+  textFontSize: number;
+  textColor: string;
+  textWeight: "normal" | "medium" | "bold" | "extrabold";
+}
+
+interface InactiveBoardCanvasProps {
+  board: Board;
+  isLight: boolean;
+  gridColor: string;
+  plan: string;
+  userRole: string;
+}
+
+function InactiveBoardCanvas({ board, isLight, gridColor, plan, userRole }: InactiveBoardCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentRatio = board.aspectRatio || "16:9";
+  const bDim = getBoardDimensions(currentRatio);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setScale(entry.contentRect.width / bDim.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [bDim.width]);
+
+  return (
+    <div ref={containerRef} className="w-full h-full relative">
+      <div 
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: bDim.width,
+          height: bDim.height,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left"
+        }}
+        className="w-full h-full relative"
+      >
+        {board.nodes.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 z-[40]">
+            <div className="bg-[#090b11]/95 border border-border-medium rounded-[32px] p-6 flex flex-col items-center gap-3.5 shadow-2xl max-w-xs text-center select-none backdrop-blur-md">
+              <div className="w-10 h-10 rounded-2xl bg-foreground/[0.03] border border-border-medium flex items-center justify-center text-text-dim">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <h4 className="text-xs font-extrabold text-foreground-pure">Empty Slide Page</h4>
+                <p className="text-[9px] text-text-dim leading-snug">
+                  Click slide to activate and upload screenshots!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CSS Grid Layer */}
+        {board.gridVisible && (
+          <div 
+            className="absolute inset-0 pointer-events-none opacity-[0.12]"
+            style={{
+              backgroundImage: board.gridVariant === "dots" 
+                ? `radial-gradient(${gridColor} 1.5px, transparent 1.5px)` 
+                : `linear-gradient(${gridColor} 1px, transparent 1px), linear-gradient(90deg, ${gridColor} 1px, transparent 1px)`,
+              backgroundSize: "24px 24px"
+            }}
+          />
+        )}
+
+        {/* Text Overlay Layer */}
+        {(board.textOverlay || board.textAccent) && (
+          <div 
+            className="absolute left-0 right-0 flex flex-col items-center pointer-events-none z-50 px-6"
+            style={{
+              top: board.textPosition === "Top" ? 40 : "auto",
+              bottom: board.textPosition === "Bottom" ? 40 : "auto",
+            }}
+          >
+            {board.textAccent && (
+              <span
+                className="tracking-wide uppercase font-black drop-shadow-sm select-none text-center mb-1.5"
+                style={{
+                  fontSize: `${Math.max(12, Math.round((board.textFontSize || 32) * 0.45))}px`,
+                  color: board.textAccentColor || "#f97316",
+                  letterSpacing: "0.15em",
+                }}
+              >
+                {board.textAccent}
+              </span>
+            )}
+            {board.textOverlay && (
+              <span 
+                className="tracking-tight drop-shadow-md select-none text-center leading-none"
+                style={{
+                  fontSize: `${board.textFontSize}px`,
+                  fontWeight: board.textWeight === "normal" ? 400 : board.textWeight === "medium" ? 500 : board.textWeight === "bold" ? 700 : 800,
+                  color: board.textColor || (isLight ? "#000000" : "#ffffff"),
+                }}
+              >
+                {board.textOverlay}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Inset safety boundary guide */}
+        <div 
+          className="absolute rounded-xl border border-dashed border-white/5 pointer-events-none transition-all duration-300"
+          style={{
+            inset: board.paddingLevel === "Compact" ? "20px" : board.paddingLevel === "Spacious" ? "80px" : "48px",
+            opacity: 0.5
+          }}
+        />
+
+        {/* Static Device Mockups Render Map */}
+        {board.nodes.map((node) => (
+          <div
+            key={node.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: node.position?.x ?? 0,
+              top: node.position?.y ?? 0,
+            }}
+          >
+            <StaticDeviceMockup node={node} shadowIntensity={board.shadowIntensity} />
+          </div>
+        ))}
+
+        {/* Live Canvas Watermark for Free Plan users (exempting Admins) */}
+        {plan === "free" && userRole !== "admin" && (
+          <div 
+            className="absolute bottom-6 right-6 z-[100] pointer-events-none select-none flex items-center gap-2 px-3.5 py-2 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md animate-fade-in"
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.45)",
+            }}
+          >
+            <img 
+              src="/logo.png" 
+              alt="Muckly Logo" 
+              className="w-5 h-5 rounded-md border border-white/10 shadow-md object-cover mr-2"
+            />
+            <span className="text-[10px] font-black tracking-[0.12em] text-white uppercase font-sans">
+              Muckly
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Hover Click overlay */}
+      <div className="absolute inset-0 bg-black/0 hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100 cursor-pointer pointer-events-auto">
+        <div className="flex items-center gap-2 bg-[#090b11]/95 border border-indigo-500/30 shadow-2xl backdrop-blur-md px-5 py-3 rounded-2xl scale-95 group-hover:scale-100 transition-all select-none">
+          <svg className="w-4 h-4 text-indigo-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+          <span className="text-xs font-black uppercase tracking-wider text-foreground-pure">
+            Click to Edit Slide
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "user" }: MockupBuilderProps) {
   // SSR Hydration safeguard
@@ -836,12 +1069,15 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
 
   // Global Builder Settings
   const [title, setTitle] = useState("My App Shot");
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [selectedBg, setSelectedBg] = useState(BACKGROUND_PRESETS[0].id);
   const [customBgColor, setCustomBgColor] = useState("");
   const [shadowIntensity, setShadowIntensity] = useState<"None" | "Soft" | "Dramatic">("Soft");
   const [paddingLevel, setPaddingLevel] = useState<"Compact" | "Standard" | "Spacious">("Standard");
   
   // Text Overlay State
+  const [textAccent, setTextAccent] = useState("");
+  const [textAccentColor, setTextAccentColor] = useState("#f97316");
   const [textOverlay, setTextOverlay] = useState("");
   const [textPosition, setTextPosition] = useState<"Top" | "Bottom">("Top");
   const [textFontSize, setTextFontSize] = useState<number>(32);
@@ -856,36 +1092,6 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   // React Flow Nodes
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
 
-  interface Board {
-    id: string;
-    title: string;
-    selectedBg: string;
-    customBgColor: string;
-    shadowIntensity: "None" | "Soft" | "Dramatic";
-    paddingLevel: "Compact" | "Standard" | "Spacious";
-    textOverlay: string;
-    textPosition: "Top" | "Bottom";
-    textFontSize: number;
-    textColor: string;
-    textWeight: "normal" | "medium" | "bold" | "extrabold";
-    gridVisible: boolean;
-    gridVariant: "dots" | "lines" | "cross";
-    nodes: Node[];
-  }
-
-  interface CanvasSnapshot {
-    nodes: Node[];
-    selectedBg: string;
-    customBgColor: string;
-    shadowIntensity: "None" | "Soft" | "Dramatic";
-    paddingLevel: "Compact" | "Standard" | "Spacious";
-    textOverlay: string;
-    textPosition: "Top" | "Bottom";
-    textFontSize: number;
-    textColor: string;
-    textWeight: "normal" | "medium" | "bold" | "extrabold";
-  }
-
   // History Stacks for Active Board (Undo / Redo)
   const pastRef = useRef<CanvasSnapshot[]>([]);
   const futureRef = useRef<CanvasSnapshot[]>([]);
@@ -899,10 +1105,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
 
   const hydrateLocalStates = (board: Board) => {
     setTitle(board.title);
+    setAspectRatio(board.aspectRatio || "16:9");
     setSelectedBg(board.selectedBg);
     setCustomBgColor(board.customBgColor || "");
     setShadowIntensity(board.shadowIntensity || "Soft");
     setPaddingLevel(board.paddingLevel || "Standard");
+    setTextAccent(board.textAccent || "");
+    setTextAccentColor(board.textAccentColor || "#f97316");
     setTextOverlay(board.textOverlay || "");
     setTextPosition(board.textPosition || "Top");
     setTextFontSize(board.textFontSize || 32);
@@ -935,10 +1144,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
           const legacyBoard: Board = {
             id: `board-${Date.now()}`,
             title: state.title ?? "My App Shot",
+            aspectRatio: state.aspectRatio ?? "16:9",
             selectedBg: state.selectedBg ?? BACKGROUND_PRESETS[0].id,
             customBgColor: state.customBgColor ?? "",
             shadowIntensity: state.shadowIntensity ?? "Soft",
             paddingLevel: state.paddingLevel ?? "Standard",
+            textAccent: state.textAccent ?? "",
+            textAccentColor: state.textAccentColor ?? "#f97316",
             textOverlay: state.textOverlay ?? "",
             textPosition: state.textPosition ?? "Top",
             textFontSize: state.textFontSize ?? 32,
@@ -957,10 +1169,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
         const newBoard: Board = {
           id: `board-${Date.now()}`,
           title: "My App Shot",
+          aspectRatio: "16:9",
           selectedBg: BACKGROUND_PRESETS[0].id,
           customBgColor: "",
           shadowIntensity: "Soft",
           paddingLevel: "Standard",
+          textAccent: "",
+          textAccentColor: "#f97316",
           textOverlay: "",
           textPosition: "Top",
           textFontSize: 32,
@@ -995,10 +1210,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
           return {
             ...b,
             title,
+            aspectRatio,
             selectedBg,
             customBgColor,
             shadowIntensity,
             paddingLevel,
+            textAccent,
+            textAccentColor,
             textOverlay,
             textPosition,
             textFontSize,
@@ -1016,10 +1234,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     mounted,
     activeBoardId,
     title,
+    aspectRatio,
     selectedBg,
     customBgColor,
     shadowIntensity,
     paddingLevel,
+    textAccent,
+    textAccentColor,
     textOverlay,
     textPosition,
     textFontSize,
@@ -1135,10 +1356,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     const newBoard: Board = {
       id: newBoardId,
       title: `Board Page ${boards.length + 1}`,
+      aspectRatio,
       selectedBg: BACKGROUND_PRESETS[0].id,
       customBgColor: "",
       shadowIntensity: "Soft",
       paddingLevel: "Standard",
+      textAccent: "",
+      textAccentColor: "#f97316",
       textOverlay: "",
       textPosition: "Top",
       textFontSize: 32,
@@ -1263,10 +1487,11 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
       if (y + h > maxY) maxY = y + h;
     }
 
+    const { width: bWidth, height: bHeight } = getBoardDimensions(aspectRatio);
     if (minX === Infinity) minX = 0;
-    if (maxX === -Infinity) maxX = 1200;
+    if (maxX === -Infinity) maxX = bWidth;
     if (minY === Infinity) minY = 0;
-    if (maxY === -Infinity) maxY = 675;
+    if (maxY === -Infinity) maxY = bHeight;
 
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
@@ -1276,12 +1501,12 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     else if (paddingLevel === "Spacious") paddingValue = 80;
 
     let textSpace = 0;
-    if (textOverlay) {
-      textSpace = (textFontSize || 32) * 1.5 + 24;
+    if (textOverlay || textAccent) {
+      textSpace = (textFontSize || 32) * (textAccent ? 2.5 : 1.5) + 32;
     }
 
-    const paddingTop = paddingValue + (textOverlay && textPosition === "Top" ? textSpace : 0);
-    const paddingBottom = paddingValue + (textOverlay && textPosition === "Bottom" ? textSpace : 0);
+    const paddingTop = paddingValue + ((textOverlay || textAccent) && textPosition === "Top" ? textSpace : 0);
+    const paddingBottom = paddingValue + ((textOverlay || textAccent) && textPosition === "Bottom" ? textSpace : 0);
     const paddingLeft = paddingValue;
     const paddingRight = paddingValue;
 
@@ -1298,7 +1523,7 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
       exportWidth,
       exportHeight,
     };
-  }, [nodes, paddingLevel, textOverlay, textPosition, textFontSize]);
+  }, [nodes, paddingLevel, textOverlay, textAccent, textPosition, textFontSize, aspectRatio]);
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [zoomMode, setZoomMode] = useState<"fit" | "custom">("fit");
@@ -1846,12 +2071,16 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
             if (aspect >= 1.2) {
               detectedDeviceFrame = "Safari Browser";
               calculatedWidth = 480;
-              calculatedHeight = Math.round(calculatedWidth / aspect);
+              const bezels = getFrameBezels("Safari Browser");
+              const innerW = Math.max(10, calculatedWidth - bezels.w);
+              calculatedHeight = Math.round(innerW / aspect) + bezels.h;
               if (calculatedHeight < 280) calculatedHeight = 280;
               if (calculatedHeight > 340) calculatedHeight = 340;
             } else {
               calculatedWidth = 172;
-              calculatedHeight = Math.round(calculatedWidth / aspect);
+              const bezels = getFrameBezels(detectedDeviceFrame);
+              const innerW = Math.max(10, calculatedWidth - bezels.w);
+              calculatedHeight = Math.round(innerW / aspect) + bezels.h;
             }
           }
         } catch (e) {
@@ -1889,6 +2118,8 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
             deviceFrame: detectedDeviceFrame,
             frameColor: FRAME_COLORS[0].id,
             tilt: ANGLES[0].id,
+            screenFit: "cover",
+            showIsland: true,
           },
           selected: i === filesToUpload.length - 1, // Select the last spawned node
         };
@@ -1935,7 +2166,7 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   };
 
   // Settings modification updates data properties of the highlighted node
-  const updateSelectedNode = (field: "deviceFrame" | "frameColor" | "tilt", value: string) => {
+  const updateSelectedNode = (field: string, value: any) => {
     if (!selectedNode) return;
     takeSnapshot();
     setNodes((nds) =>
@@ -1974,6 +2205,32 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
               ...node.data,
               [field]: value,
             },
+          };
+        }
+        return node;
+      })
+    );
+  };
+
+  const updateSelectedNodeDimensions = (newWidth: number) => {
+    if (!selectedNode) return;
+    takeSnapshot();
+    const currentW = selectedNode.width || 172;
+    const currentH = selectedNode.height || 364;
+    const bezels = getFrameBezels(selectedNode.data?.deviceFrame as string | undefined);
+    const innerW = Math.max(10, currentW - bezels.w);
+    const innerH = Math.max(10, currentH - bezels.h);
+    const ratio = innerH / innerW;
+    const newInnerW = Math.max(10, newWidth - bezels.w);
+    const newH = Math.round(newInnerW * ratio) + bezels.h;
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNode.id) {
+          return {
+            ...node,
+            width: newWidth,
+            height: newH,
           };
         }
         return node;
@@ -2047,7 +2304,10 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
       if (img.width && img.height) {
         const aspect = img.width / img.height;
         const currentWidth = selectedNode.width || 172;
-        const newHeight = Math.round(currentWidth / aspect);
+        const bezels = getFrameBezels(selectedNode.data?.deviceFrame as string | undefined);
+        const innerW = Math.max(10, currentWidth - bezels.w);
+        const innerH = Math.round(innerW / aspect);
+        const newHeight = innerH + bezels.h;
 
         setNodes((nds) =>
           nds.map((n) =>
@@ -2077,26 +2337,33 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width } = entry.contentRect;
-        setScale(width / 1200);
+        const bDim = getBoardDimensions(aspectRatio);
+        setScale(width / bDim.width);
       }
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [mounted]);
+  }, [mounted, aspectRatio]);
 
   // Export PNG compiles complete coordinate array
   const handleExport = async (boardToExport?: Board) => {
     const targetBoard = boardToExport || {
+      id: activeBoardId,
       title,
+      aspectRatio,
       selectedBg,
       customBgColor,
       shadowIntensity,
       paddingLevel,
+      textAccent,
+      textAccentColor,
       textOverlay,
       textPosition,
       textFontSize,
       textColor,
       textWeight,
+      gridVisible,
+      gridVariant,
       nodes,
     };
 
@@ -2141,6 +2408,8 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
         deviceFrame: (n as any).deviceFrame || n.data?.deviceFrame,
         frameColor: (n as any).frameColor || n.data?.frameColor,
         tilt: (n as any).tilt || n.data?.tilt,
+        screenFit: (n as any).screenFit || n.data?.screenFit || "cover",
+        showIsland: (n as any).showIsland !== undefined ? (n as any).showIsland : n.data?.showIsland !== undefined ? n.data?.showIsland : true,
         selected: n.selected || false,
         zIndex: (n as any).zIndex || (n.selected ? 1000 : 0) + (Number(n.data?.customZIndex) || 0),
       }));
@@ -2150,10 +2419,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
 
       const requestBody = {
         title: targetBoard.title.trim() || "My App Mockup",
+        aspectRatio: targetBoard.aspectRatio || "16:9",
         background: targetBoard.selectedBg,
         customBgColor: targetBoard.customBgColor || null,
         shadowIntensity: targetBoard.shadowIntensity,
         paddingLevel: targetBoard.paddingLevel,
+        textAccent: targetBoard.textAccent ? targetBoard.textAccent.trim() : null,
+        textAccentColor: targetBoard.textAccentColor || null,
         textOverlay: targetBoard.textOverlay ? targetBoard.textOverlay.trim() : null,
         textPosition: targetBoard.textPosition,
         textFontSize: targetBoard.textFontSize,
@@ -2192,6 +2464,9 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
       console.error("[Export Debug] Export error:", err);
       console.error("[Export Debug] Error message:", err.message);
       showToast(err.message || "Failed to generate mockup.", "error");
+      if (err.message && (err.message.toLowerCase().includes("limit") || err.message.toLowerCase().includes("upgrade"))) {
+        setShowLimitModal(true);
+      }
     } finally {
       setIsExporting(false);
     }
@@ -2238,16 +2513,19 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   // --- CANVAS HISTORY ENGINE (UNDO / REDO) ---
   const getCurrentSnapshot = useCallback((): CanvasSnapshot => ({
     nodes: JSON.parse(JSON.stringify(nodes)),
+    aspectRatio,
     selectedBg,
     customBgColor,
     shadowIntensity,
     paddingLevel,
+    textAccent,
+    textAccentColor,
     textOverlay,
     textPosition,
     textFontSize,
     textColor,
     textWeight,
-  }), [nodes, selectedBg, customBgColor, shadowIntensity, paddingLevel, textOverlay, textPosition, textFontSize, textColor, textWeight]);
+  }), [nodes, aspectRatio, selectedBg, customBgColor, shadowIntensity, paddingLevel, textAccent, textAccentColor, textOverlay, textPosition, textFontSize, textColor, textWeight]);
 
   const takeSnapshot = useCallback(() => {
     const current = getCurrentSnapshot();
@@ -2259,10 +2537,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
 
   const applySnapshot = (snapshot: CanvasSnapshot) => {
     setNodes(snapshot.nodes);
+    setAspectRatio(snapshot.aspectRatio || "16:9");
     setSelectedBg(snapshot.selectedBg);
     setCustomBgColor(snapshot.customBgColor);
     setShadowIntensity(snapshot.shadowIntensity);
     setPaddingLevel(snapshot.paddingLevel);
+    setTextAccent(snapshot.textAccent || "");
+    setTextAccentColor(snapshot.textAccentColor || "#f97316");
     setTextOverlay(snapshot.textOverlay);
     setTextPosition(snapshot.textPosition);
     setTextFontSize(snapshot.textFontSize);
@@ -2330,13 +2611,14 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   const alignCenterH = () => {
     if (nodes.length === 0) return;
     takeSnapshot();
+    const { width: bWidth } = getBoardDimensions(aspectRatio);
     const targets = getSelectedOrAllNodes();
     const targetIds = new Set(targets.map((n) => n.id));
 
     if (targets.length === 1) {
       const node = targets[0];
       const w = node.width || 172;
-      const centeredX = Math.round((1200 - w) / 2);
+      const centeredX = Math.round((bWidth - w) / 2);
       setNodes((nds) => nds.map((n) => (n.id === node.id ? { ...n, position: { ...n.position, x: centeredX } } : n)));
       showToast("Centered horizontally", "info");
       return;
@@ -2345,7 +2627,7 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     const minX = Math.min(...targets.map((n) => n.position.x));
     const maxX = Math.max(...targets.map((n) => n.position.x + (n.width || 172)));
     const boundingWidth = maxX - minX;
-    const targetCenter = (1200 - boundingWidth) / 2;
+    const targetCenter = (bWidth - boundingWidth) / 2;
     const shift = Math.round(targetCenter - minX);
 
     setNodes((nds) =>
@@ -2357,13 +2639,14 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   const alignCenterV = () => {
     if (nodes.length === 0) return;
     takeSnapshot();
+    const { height: bHeight } = getBoardDimensions(aspectRatio);
     const targets = getSelectedOrAllNodes();
     const targetIds = new Set(targets.map((n) => n.id));
 
     if (targets.length === 1) {
       const node = targets[0];
       const h = node.height || 364;
-      const centeredY = Math.round((675 - h) / 2);
+      const centeredY = Math.round((bHeight - h) / 2);
       setNodes((nds) => nds.map((n) => (n.id === node.id ? { ...n, position: { ...n.position, y: centeredY } } : n)));
       showToast("Centered vertically", "info");
       return;
@@ -2372,7 +2655,7 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     const minY = Math.min(...targets.map((n) => n.position.y));
     const maxY = Math.max(...targets.map((n) => n.position.y + (n.height || 364)));
     const boundingHeight = maxY - minY;
-    const targetCenter = (675 - boundingHeight) / 2;
+    const targetCenter = (bHeight - boundingHeight) / 2;
     const shift = Math.round(targetCenter - minY);
 
     setNodes((nds) =>
@@ -2447,14 +2730,15 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
   const autoCascade = () => {
     if (nodes.length === 0) return;
     takeSnapshot();
+    const { width: bWidth, height: bHeight } = getBoardDimensions(aspectRatio);
 
     if (nodes.length === 1) {
       setNodes((nds) => [
         {
           ...nds[0],
           position: {
-            x: Math.round((1200 - (nds[0].width || 172)) / 2),
-            y: Math.round((675 - (nds[0].height || 364)) / 2),
+            x: Math.round((bWidth - (nds[0].width || 172)) / 2),
+            y: Math.round((bHeight - (nds[0].height || 364)) / 2),
           },
           data: { ...nds[0].data, tilt: "Floating" },
         },
@@ -2464,15 +2748,21 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     }
 
     if (nodes.length === 2) {
+      const w = nodes[0].width || 172;
+      const spacing = Math.round(w * 0.35);
+      const totalW = w * 2 + spacing;
+      const startX = Math.round((bWidth - totalW) / 2);
+      const startY = Math.round((bHeight - (nodes[0].height || 364)) / 2);
+
       setNodes((nds) => [
         {
           ...nds[0],
-          position: { x: 380, y: 155 },
+          position: { x: startX, y: startY },
           data: { ...nds[0].data, tilt: "Left Tilt", customZIndex: 1 },
         },
         {
           ...nds[1],
-          position: { x: 580, y: 155 },
+          position: { x: startX + w + spacing, y: startY },
           data: { ...nds[1].data, tilt: "Right Tilt", customZIndex: 2 },
         },
       ]);
@@ -2481,20 +2771,27 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     }
 
     if (nodes.length === 3) {
+      const w = nodes[0].width || 172;
+      const h = nodes[0].height || 364;
+      const spacing = Math.round(w * 0.25);
+      const totalW = w * 3 + spacing * 2;
+      const startX = Math.round((bWidth - totalW) / 2);
+      const centerY = Math.round((bHeight - h) / 2);
+
       setNodes((nds) => [
         {
           ...nds[0],
-          position: { x: 260, y: 170 },
+          position: { x: startX, y: centerY + 20 },
           data: { ...nds[0].data, tilt: "Left Tilt", customZIndex: 1 },
         },
         {
           ...nds[1],
-          position: { x: 480, y: 135 },
+          position: { x: startX + w + spacing, y: centerY - 20 },
           data: { ...nds[1].data, tilt: "Floating", customZIndex: 5 },
         },
         {
           ...nds[2],
-          position: { x: 700, y: 170 },
+          position: { x: startX + (w + spacing) * 2, y: centerY + 20 },
           data: { ...nds[2].data, tilt: "Right Tilt", customZIndex: 1 },
         },
       ]);
@@ -2503,14 +2800,16 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     }
 
     const count = nodes.length;
-    const stepX = Math.min(180, Math.floor(800 / (count - 1)));
-    const startX = Math.round((1200 - (stepX * (count - 1) + 172)) / 2);
+    const availableW = Math.round(bWidth * 0.8);
+    const stepX = Math.min(180, Math.floor(availableW / (count - 1)));
+    const startX = Math.round((bWidth - (stepX * (count - 1) + 172)) / 2);
+    const startY = Math.round((bHeight - (nodes[0]?.height || 364)) / 2);
     setNodes((nds) =>
       nds.map((node, idx) => ({
         ...node,
         position: {
           x: startX + idx * stepX,
-          y: 155 + (idx % 2 === 0 ? 0 : 25),
+          y: startY + (idx % 2 === 0 ? 0 : 25),
         },
         data: {
           ...node.data,
@@ -2522,19 +2821,68 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     showToast(`Preset: ${count}-Device Cascade`, "success");
   };
 
+  const applyStockAnalysisTemplate = () => {
+    takeSnapshot();
+    const { width: bWidth } = getBoardDimensions("9:16");
+    const nodeWidth = 420;
+    const nodeHeight = 884;
+    const centeredX = Math.round((bWidth - nodeWidth) / 2);
+    const centeredY = 220;
+
+    const templateNode: Node = {
+      id: `node-${Date.now()}`,
+      type: "deviceMockup",
+      position: { x: centeredX, y: centeredY },
+      width: nodeWidth,
+      height: nodeHeight,
+      data: {
+        deviceFrame: "iPhone 16 Pro",
+        frameColor: "Space Black",
+        tilt: "Flat",
+        shadowIntensity: "Soft",
+        screenshotUrl: "/templates/stock-analysis.png",
+        screenFit: "cover",
+        showIsland: false,
+        customZIndex: 1,
+      },
+    };
+
+    setAspectRatio("9:16");
+    setSelectedBg("minimal-frost");
+    setCustomBgColor("");
+    setShadowIntensity("Soft");
+    setPaddingLevel("Standard");
+    setTextAccent("Top Expert");
+    setTextAccentColor("#f97316");
+    setTextOverlay("Stock Analysis");
+    setTextColor("#000000");
+    setTextFontSize(40);
+    setTextWeight("extrabold");
+    setGridVisible(false);
+    setNodes([templateNode]);
+
+    showToast("Applied Template: Top Expert Stock Analysis", "success");
+  };
+
   // --- ONE-CLICK COPY IMAGE TO CLIPBOARD ---
   const handleCopyToClipboard = async (boardToExport?: Board) => {
     const targetBoard = boardToExport || {
+      id: activeBoardId,
       title,
+      aspectRatio,
       selectedBg,
       customBgColor,
       shadowIntensity,
       paddingLevel,
+      textAccent,
+      textAccentColor,
       textOverlay,
       textPosition,
       textFontSize,
       textColor,
       textWeight,
+      gridVisible,
+      gridVariant,
       nodes,
     };
 
@@ -2578,16 +2926,21 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
         deviceFrame: (n as any).deviceFrame || n.data?.deviceFrame,
         frameColor: (n as any).frameColor || n.data?.frameColor,
         tilt: (n as any).tilt || n.data?.tilt,
+        screenFit: (n as any).screenFit || n.data?.screenFit || "cover",
+        showIsland: (n as any).showIsland !== undefined ? (n as any).showIsland : n.data?.showIsland !== undefined ? n.data?.showIsland : true,
         selected: n.selected || false,
         zIndex: (n as any).zIndex || (n.selected ? 1000 : 0) + (Number(n.data?.customZIndex) || 0),
       }));
 
       const requestBody = {
         title: targetBoard.title.trim() || "My App Mockup",
+        aspectRatio: targetBoard.aspectRatio || "16:9",
         background: targetBoard.selectedBg,
         customBgColor: targetBoard.customBgColor || null,
         shadowIntensity: targetBoard.shadowIntensity,
         paddingLevel: targetBoard.paddingLevel,
+        textAccent: targetBoard.textAccent ? targetBoard.textAccent.trim() : null,
+        textAccentColor: targetBoard.textAccentColor || null,
         textOverlay: targetBoard.textOverlay ? targetBoard.textOverlay.trim() : null,
         textPosition: targetBoard.textPosition,
         textFontSize: targetBoard.textFontSize,
@@ -2629,6 +2982,9 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
     } catch (err: any) {
       console.error("[Clipboard Error]:", err);
       showToast(err.message || "Failed to copy mockup image.", "error");
+      if (err.message && (err.message.toLowerCase().includes("limit") || err.message.toLowerCase().includes("upgrade"))) {
+        setShowLimitModal(true);
+      }
     } finally {
       setIsCopying(false);
     }
@@ -2850,25 +3206,38 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                   )}
 
                   {/* Typography Headline Overlay */}
-                  {textOverlay && (
+                  {(textOverlay || textAccent) && (
                     <div
-                      className="absolute left-0 right-0 flex justify-center items-center z-40"
+                      className="absolute left-0 right-0 flex flex-col justify-center items-center z-40 px-6 text-center"
                       style={{
                         top: textPosition === "Top" ? `24px` : "auto",
                         bottom: textPosition === "Bottom" ? `24px` : "auto",
                       }}
                     >
-                      <span
-                        className="tracking-tight leading-none text-center select-none font-sans"
-                        style={{
-                          fontSize: `${textFontSize}px`,
-                          fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
-                          color: textColor || (selectedBg === "white" || selectedBg === "candy" ? "#000000" : "#ffffff"),
-                          textShadow: "0 2px 10px rgba(0, 0, 0, 0.15)",
-                        }}
-                      >
-                        {textOverlay}
-                      </span>
+                      {textAccent && (
+                        <span
+                          className="tracking-tight leading-tight select-none font-sans font-extrabold"
+                          style={{
+                            fontSize: `${Math.round(textFontSize * 0.9)}px`,
+                            color: textAccentColor || "#f97316",
+                          }}
+                        >
+                          {textAccent}
+                        </span>
+                      )}
+                      {textOverlay && (
+                        <span
+                          className="tracking-tight leading-tight select-none font-sans"
+                          style={{
+                            fontSize: `${textFontSize}px`,
+                            fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
+                            color: textColor || (selectedBg === "white" || selectedBg === "candy" || selectedBg === "minimal-frost" ? "#000000" : "#ffffff"),
+                            textShadow: (selectedBg === "white" || selectedBg === "candy" || selectedBg === "minimal-frost") ? "none" : "0 2px 10px rgba(0, 0, 0, 0.15)",
+                          }}
+                        >
+                          {textOverlay}
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -3009,6 +3378,48 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
             />
           </div>
 
+          {/* Featured Showcase Templates Card */}
+          <div className="border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent backdrop-blur-sm rounded-3xl p-5 relative overflow-hidden flex flex-col gap-3 shadow-lg shadow-indigo-500/5">
+            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-wider text-foreground-pure">Featured Template</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-500/20 border border-amber-500/30 text-amber-300">
+                PRO PRESET
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 bg-black/20 border border-white/5 rounded-2xl p-3">
+              <div className="w-12 h-16 rounded-xl bg-gradient-to-b from-white to-sky-100 border border-black/10 overflow-hidden flex flex-col items-center justify-center p-1 shrink-0 shadow-sm relative">
+                <div className="w-6 h-1 bg-amber-500 rounded-full mb-0.5" />
+                <div className="w-7 h-1 bg-black rounded-full mb-1" />
+                <div className="w-8 h-10 rounded-lg bg-black p-0.5 flex flex-col items-center">
+                  <div className="w-3 h-0.5 bg-zinc-800 rounded-full mb-0.5" />
+                  <div className="w-full flex-1 bg-zinc-900 rounded-[2px]" />
+                </div>
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-bold text-foreground-pure leading-tight">Top Expert Stock Analysis</span>
+                <span className="text-[10px] text-text-muted mt-0.5 leading-snug">
+                  App Store portrait card with dual-color headline, minimal studio lighting &amp; dark market analysis feed.
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={applyStockAnalysisTemplate}
+              className="w-full py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 border border-indigo-400/30 text-white font-extrabold text-xs shadow-md active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+              </svg>
+              <span>Apply Stock Analysis Showcase</span>
+            </button>
+          </div>
+
           <div className="border border-border-medium bg-bg-card/50 backdrop-blur-sm rounded-3xl p-6 relative overflow-hidden flex flex-col gap-5">
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-foreground/10 to-transparent" />
             
@@ -3068,6 +3479,47 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                       </div>
                     )}
                   </div>
+
+                  {/* Quick-insert stock analysis template screen button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      takeSnapshot();
+                      const { width: bWidth, height: bHeight } = getBoardDimensions(aspectRatio);
+                      const is916 = aspectRatio === "9:16";
+                      const nodeWidth = is916 ? 420 : 172;
+                      const nodeHeight = is916 ? 884 : 364;
+                      const newNode: Node = {
+                        id: `node-${Date.now()}`,
+                        type: "deviceMockup",
+                        position: {
+                          x: Math.round((bWidth - nodeWidth) / 2),
+                          y: is916 ? 220 : Math.round((bHeight - nodeHeight) / 2),
+                        },
+                        width: nodeWidth,
+                        height: nodeHeight,
+                        data: {
+                          deviceFrame: "iPhone 16 Pro",
+                          frameColor: "Space Black",
+                          tilt: "Flat",
+                          shadowIntensity: "Soft",
+                          screenshotUrl: "/templates/stock-analysis.png",
+                          screenFit: "cover",
+                          showIsland: false,
+                          customZIndex: nodes.length + 1,
+                        },
+                      };
+                      setNodes([...nodes, newNode]);
+                      showToast("Added Stock Analysis Screen!", "success");
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.05] border border-border-medium hover:border-indigo-500/30 text-[10px] font-bold text-foreground-pure transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
+                  >
+                    <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Insert Stock Analysis Screen</span>
+                  </button>
 
                   {/* Figma Link Sync Input */}
                   <div className="border border-border-medium bg-bg-card/20 rounded-2xl p-4 flex flex-col gap-3 mt-1">
@@ -3340,6 +3792,109 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                         </div>
                       </div>
 
+                      {/* Screenshot Fit Mode */}
+                      <div className="flex flex-col gap-1.5 text-left">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-text-muted">Screenshot Fit Mode</label>
+                          <span className="text-[8px] text-text-dim">
+                            {(selectedNode.data.screenFit || "cover") === "contain" ? "Show Entire Screen" : "Fill Mockup Bezel"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => updateSelectedNode("screenFit", "cover")}
+                            className={`py-1.5 px-2.5 rounded-xl border text-[10px] active:scale-[0.98] transition-all select-none cursor-pointer text-center ${
+                              (selectedNode.data.screenFit || "cover") === "cover"
+                                ? "border-indigo-500 bg-indigo-500/5 text-foreground-pure font-bold"
+                                : "border-border-medium bg-foreground/[0.01] hover:bg-foreground/[0.03] text-text-semi-muted"
+                            }`}
+                          >
+                            Cover (Fill)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateSelectedNode("screenFit", "contain")}
+                            className={`py-1.5 px-2.5 rounded-xl border text-[10px] active:scale-[0.98] transition-all select-none cursor-pointer text-center ${
+                              selectedNode.data.screenFit === "contain"
+                                ? "border-indigo-500 bg-indigo-500/5 text-foreground-pure font-bold"
+                                : "border-border-medium bg-foreground/[0.01] hover:bg-foreground/[0.03] text-text-semi-muted"
+                            }`}
+                          >
+                            Contain (Show All)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Hardware Island / Notch Toggle (Smartphones) */}
+                      {!isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) && (
+                        <div className="flex flex-col gap-1.5 text-left">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-text-muted">Hardware Island / Notch</label>
+                            <span className="text-[8px] text-text-dim">
+                              {selectedNode.data.showIsland !== false ? "Visible" : "Hidden"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updateSelectedNode("showIsland", true)}
+                              className={`py-1.5 px-2.5 rounded-xl border text-[10px] active:scale-[0.98] transition-all select-none cursor-pointer text-center ${
+                                selectedNode.data.showIsland !== false
+                                  ? "border-indigo-500 bg-indigo-500/5 text-foreground-pure font-bold"
+                                  : "border-border-medium bg-foreground/[0.01] hover:bg-foreground/[0.03] text-text-semi-muted"
+                              }`}
+                            >
+                              Show Notch
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSelectedNode("showIsland", false)}
+                              className={`py-1.5 px-2.5 rounded-xl border text-[10px] active:scale-[0.98] transition-all select-none cursor-pointer text-center ${
+                                selectedNode.data.showIsland === false
+                                  ? "border-indigo-500 bg-indigo-500/5 text-foreground-pure font-bold"
+                                  : "border-border-medium bg-foreground/[0.01] hover:bg-foreground/[0.03] text-text-semi-muted"
+                              }`}
+                            >
+                              Hide Notch
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mockup Scale Presets & Slider */}
+                      <div className="flex flex-col gap-1.5 text-left">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-text-muted">
+                            Mockup Width ({selectedNode.width || 172}px)
+                          </label>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => updateSelectedNodeDimensions(isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) ? 480 : 172)}
+                              className="px-2 py-0.5 rounded-md bg-foreground/[0.03] hover:bg-foreground/[0.06] border border-border-medium text-[8px] font-bold text-text-muted cursor-pointer active:scale-95"
+                            >
+                              Standard
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSelectedNodeDimensions(isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) ? 720 : 420)}
+                              className="px-2 py-0.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-[8px] font-bold text-indigo-400 cursor-pointer active:scale-95"
+                            >
+                              Hero
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min={isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) ? 280 : 120}
+                          max={isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) ? 900 : 560}
+                          value={selectedNode.width || (isDesktopFrame(selectedNode.data.deviceFrame as string | undefined) ? 480 : 172)}
+                          onChange={(e) => updateSelectedNodeDimensions(Number(e.target.value))}
+                          className="w-full accent-indigo-500 h-1.5 bg-foreground/[0.06] rounded-lg cursor-pointer"
+                        />
+                      </div>
+
                       {/* Depth Layer Stacking Controls */}
                       <div className="flex flex-col gap-1.5 text-left mb-2">
                         <label className="text-[10px] font-bold text-text-muted">Depth Ordering Layers</label>
@@ -3493,6 +4048,34 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
               {openSections.composition && (
                 <div className="flex flex-col gap-4 mt-3 animate-fade-in">
                   
+                  {/* Canvas Aspect Ratio */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <label className="text-[10px] font-bold text-text-muted">Canvas Aspect Ratio</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: "16:9", label: "16:9 Landscape" },
+                        { id: "9:16", label: "9:16 Portrait" },
+                        { id: "1:1", label: "1:1 Square" },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            takeSnapshot();
+                            setAspectRatio(item.id as any);
+                          }}
+                          className={`py-2 px-1.5 rounded-xl border text-[10px] font-bold active:scale-[0.98] transition-all select-none cursor-pointer text-center ${
+                            aspectRatio === item.id
+                              ? "border-indigo-500 bg-indigo-500/10 text-indigo-400 font-extrabold"
+                              : "border-border-medium bg-foreground/[0.01] hover:bg-foreground/[0.03] text-text-semi-muted"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Shadow levels */}
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-[10px] font-bold text-text-muted">Global Drop Shadow Intensity</label>
@@ -3604,6 +4187,39 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
               {openSections.text && (
                 <div className="flex flex-col gap-4 mt-3 animate-fade-in">
                   
+                  {/* Category / Accent Text (e.g. "Top Expert") */}
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-text-muted">Top Accent Line (Optional)</label>
+                      <span className="text-[9px] font-semibold text-text-dim">e.g. Featured tag</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={textAccentColor || "#f97316"}
+                        onChange={(e) => setTextAccentColor(e.target.value)}
+                        className="w-9 h-9 rounded-xl border border-border-strong flex-shrink-0 bg-transparent cursor-pointer"
+                        title="Accent Line Color"
+                      />
+                      <input
+                        type="text"
+                        value={textAccent}
+                        onChange={(e) => setTextAccent(e.target.value)}
+                        placeholder="e.g. Top Expert, New Release"
+                        className="flex-1 bg-foreground/[0.02] border border-border-medium text-foreground-pure rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50"
+                      />
+                      {textAccent && (
+                        <button
+                          type="button"
+                          onClick={() => setTextAccent("")}
+                          className="px-2.5 py-2 border border-border-medium hover:border-rose-500/30 text-text-muted hover:text-rose-400 rounded-xl text-[10px] transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-[10px] font-bold text-text-muted">Canvas Headline Text</label>
                     <input
@@ -3853,6 +4469,8 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
           <div className="flex flex-col gap-8">
             {boards.map((board, index) => {
               const isActive = board.id === activeBoardId;
+              const boardRatio = isActive ? aspectRatio : (board.aspectRatio || "16:9");
+              const bDim = getBoardDimensions(boardRatio);
               const isLight = board.selectedBg === "white" || board.selectedBg === "candy" || isLightColor(board.customBgColor);
               const gridColor = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)";
               const bgStyle = board.customBgColor || BACKGROUND_PRESETS.find(bg => bg.id === board.selectedBg)?.style || BACKGROUND_PRESETS[0].style;
@@ -4186,6 +4804,27 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
 
                       <div className="w-px h-4 bg-border-medium hidden md:block" />
 
+                      {/* Canvas Aspect Ratio Switcher */}
+                      <div className="flex items-center gap-1 bg-foreground/[0.03] p-0.5 rounded-xl border border-border-medium">
+                        {(["16:9", "9:16", "1:1"] as const).map((ratio) => (
+                          <button
+                            key={ratio}
+                            type="button"
+                            onClick={() => setAspectRatio(ratio)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                              aspectRatio === ratio
+                                ? "bg-indigo-500 text-white shadow-sm"
+                                : "text-text-muted hover:text-foreground-pure hover:bg-foreground/[0.04]"
+                            }`}
+                            title={`Switch to ${ratio === "16:9" ? "Landscape (16:9)" : ratio === "9:16" ? "Portrait (9:16)" : "Square (1:1)"}`}
+                          >
+                            {ratio}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="w-px h-4 bg-border-medium hidden md:block" />
+
                       {/* 3. Quick Copy to Clipboard */}
                       <button
                         type="button"
@@ -4211,10 +4850,16 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                     </div>
                   )}
 
-                  {/* Scaled Responsive Canvas aspect-[16/9] */}
+                  {/* Scaled Responsive Canvas Container */}
                   <div 
                     ref={isActive ? containerRef : undefined}
-                    className={`w-full aspect-[16/9] rounded-2xl overflow-hidden transition-all duration-500 relative select-none border border-border-medium bg-black/10 ${!isActive ? "hover:shadow-md transition-shadow group" : ""}`}
+                    className={`w-full ${
+                      boardRatio === "9:16"
+                        ? "max-w-[480px] mx-auto aspect-[9/16]"
+                        : boardRatio === "1:1"
+                        ? "max-w-[650px] mx-auto aspect-square"
+                        : "aspect-[16/9]"
+                    } rounded-2xl overflow-hidden transition-all duration-500 relative select-none border border-border-medium bg-black/10 ${!isActive ? "hover:shadow-md transition-shadow group" : ""}`}
                     style={{ background: bgStyle }}
                   >
                     {isActive ? (
@@ -4229,8 +4874,8 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                             position: "absolute",
                             top: 0,
                             left: 0,
-                            width: 1200,
-                            height: 675,
+                            width: bDim.width,
+                            height: bDim.height,
                             transform: `scale(${scale})`,
                             transformOrigin: "top left"
                           }}
@@ -4296,24 +4941,38 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                               )}
 
                               {/* Text Overlay inside sandbox */}
-                              {textOverlay && (
+                              {(textOverlay || textAccent) && (
                                 <div 
-                                  className="absolute left-0 right-0 flex justify-center pointer-events-none z-50 px-6"
+                                  className="absolute left-0 right-0 flex flex-col items-center pointer-events-none z-50 px-6"
                                   style={{
                                     top: textPosition === "Top" ? 40 : "auto",
                                     bottom: textPosition === "Bottom" ? 40 : "auto",
                                   }}
                                 >
-                                  <span 
-                                    className="tracking-tight drop-shadow-md select-none text-center leading-none"
-                                    style={{
-                                      fontSize: `${textFontSize}px`,
-                                      fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
-                                      color: textColor || (isBgLight ? "#000000" : "#ffffff"),
-                                    }}
-                                  >
-                                    {textOverlay}
-                                  </span>
+                                  {textAccent && (
+                                    <span
+                                      className="tracking-wide uppercase font-black drop-shadow-sm select-none text-center mb-1.5"
+                                      style={{
+                                        fontSize: `${Math.max(12, Math.round(textFontSize * 0.45))}px`,
+                                        color: textAccentColor || "#f97316",
+                                        letterSpacing: "0.15em",
+                                      }}
+                                    >
+                                      {textAccent}
+                                    </span>
+                                  )}
+                                  {textOverlay && (
+                                    <span 
+                                      className="tracking-tight drop-shadow-md select-none text-center leading-none"
+                                      style={{
+                                        fontSize: `${textFontSize}px`,
+                                        fontWeight: textWeight === "normal" ? 400 : textWeight === "medium" ? 500 : textWeight === "bold" ? 700 : 800,
+                                        color: textColor || (isBgLight ? "#000000" : "#ffffff"),
+                                      }}
+                                    >
+                                      {textOverlay}
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
@@ -4349,125 +5008,13 @@ export function MockupBuilder({ plan, initialUsage, initialMockups, userRole = "
                         </div>
                       )
                     ) : (
-                      // INACTIVE BOARD — High Fidelity Static Canvas Render with identical visuals
-                      <div 
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: 1200,
-                          height: 675,
-                          transform: `scale(${scale})`,
-                          transformOrigin: "top left"
-                        }}
-                        className="w-full h-full relative"
-                      >
-                        {board.nodes.length === 0 && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 z-[40]">
-                            <div className="bg-[#090b11]/95 border border-border-medium rounded-[32px] p-6 flex flex-col items-center gap-3.5 shadow-2xl max-w-xs text-center select-none backdrop-blur-md">
-                              <div className="w-10 h-10 rounded-2xl bg-foreground/[0.03] border border-border-medium flex items-center justify-center text-text-dim">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              <div className="flex flex-col gap-0.5">
-                                <h4 className="text-xs font-extrabold text-foreground-pure">Empty Slide Page</h4>
-                                <p className="text-[9px] text-text-dim leading-snug">
-                                  Click slide to activate and upload screenshots!
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {/* CSS Grid Layer */}
-                        {board.gridVisible && (
-                          <div 
-                            className="absolute inset-0 pointer-events-none opacity-[0.12]"
-                            style={{
-                              backgroundImage: board.gridVariant === "dots" 
-                                ? `radial-gradient(${gridColor} 1.5px, transparent 1.5px)` 
-                                : `linear-gradient(${gridColor} 1px, transparent 1px), linear-gradient(90deg, ${gridColor} 1px, transparent 1px)`,
-                              backgroundSize: "24px 24px"
-                            }}
-                          />
-                        )}
-
-                        {/* Text Overlay Layer */}
-                        {board.textOverlay && (
-                          <div 
-                            className="absolute left-0 right-0 flex justify-center pointer-events-none z-50 px-6"
-                            style={{
-                              top: board.textPosition === "Top" ? 40 : "auto",
-                              bottom: board.textPosition === "Bottom" ? 40 : "auto",
-                            }}
-                          >
-                            <span 
-                              className="tracking-tight drop-shadow-md select-none text-center leading-none"
-                              style={{
-                                fontSize: `${board.textFontSize}px`,
-                                fontWeight: board.textWeight === "normal" ? 400 : board.textWeight === "medium" ? 500 : board.textWeight === "bold" ? 700 : 800,
-                                color: board.textColor || (isLight ? "#000000" : "#ffffff"),
-                              }}
-                            >
-                              {board.textOverlay}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Inset safety boundary guide */}
-                        <div 
-                          className="absolute rounded-xl border border-dashed border-white/5 pointer-events-none transition-all duration-300"
-                          style={{
-                            inset: board.paddingLevel === "Compact" ? "20px" : board.paddingLevel === "Spacious" ? "80px" : "48px",
-                            opacity: 0.5
-                          }}
-                        />
-
-                        {/* Static Device Mockups Render Map */}
-                        {board.nodes.map((node) => (
-                          <div
-                            key={node.id}
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: node.position?.x ?? 0,
-                              top: node.position?.y ?? 0,
-                            }}
-                          >
-                            <StaticDeviceMockup node={node} shadowIntensity={board.shadowIntensity} />
-                          </div>
-                        ))}
-
-                        {/* Live Canvas Watermark for Free Plan users (exempting Admins) */}
-                        {plan === "free" && userRole !== "admin" && (
-                          <div 
-                            className="absolute bottom-6 right-6 z-[100] pointer-events-none select-none flex items-center gap-2 px-3.5 py-2 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md animate-fade-in"
-                            style={{
-                              backgroundColor: "rgba(15, 23, 42, 0.45)",
-                            }}
-                          >
-                            <img 
-                              src="/logo.png" 
-                              alt="Muckly Logo" 
-                              className="w-5 h-5 rounded-md border border-white/10 shadow-md object-cover mr-2"
-                            />
-                            <span className="text-[10px] font-black tracking-[0.12em] text-white uppercase font-sans">
-                              Muckly
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Hover Click overlay */}
-                        <div className="absolute inset-0 bg-black/0 hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100 cursor-pointer pointer-events-auto">
-                          <div className="flex items-center gap-2 bg-[#090b11]/95 border border-indigo-500/30 shadow-2xl backdrop-blur-md px-5 py-3 rounded-2xl scale-95 group-hover:scale-100 transition-all select-none">
-                            <svg className="w-4 h-4 text-indigo-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            <span className="text-xs font-extrabold text-foreground-pure uppercase tracking-wider">
-                              Click slide board to edit
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                      <InactiveBoardCanvas
+                        board={board}
+                        isLight={isLight}
+                        gridColor={gridColor}
+                        plan={plan}
+                        userRole={userRole}
+                      />
                     )}
                   </div>
                   

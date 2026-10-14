@@ -3,6 +3,10 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { dodo } from "@/lib/dodo";
 
+import { db } from "@/db";
+import { user as userTable, subscriptions } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+
 export async function POST(request: NextRequest) {
   try {
     // 1. Authenticate user session securely on the server
@@ -19,18 +23,57 @@ export async function POST(request: NextRequest) {
 
     const { user } = session;
 
-    // 2. Resolve the dynamic Dodo Payments Product ID from body parameters
-    let plan = "pro";
-    let billingPeriod = "monthly";
+    // 1.5 Fetch fresh user record from database
+    const freshUser = await db.query.user.findFirst({
+      where: eq(userTable.id, user.id),
+    });
 
-    try {
-      const body = await request.json();
-      if (body) {
-        if (body.plan) plan = body.plan;
-        if (body.billingPeriod) billingPeriod = body.billingPeriod;
-      }
-    } catch (e) {
-      // Body might be empty or invalid JSON, ignore and fallback to defaults
+    if (!freshUser) {
+      return NextResponse.json(
+        { error: "User account not found." },
+        { status: 404 }
+      );
+    }
+
+    if (freshUser.role === "admin") {
+      return NextResponse.json(
+        { error: "Admin accounts already enjoy complimentary Pro access and do not require a paid plan." },
+        { status: 400 }
+      );
+    }
+
+    // 2. Validate request parameters
+    const body = await request.json().catch(() => ({}));
+    const plan = body.plan;
+    const billingPeriod = body.billingPeriod || "monthly";
+
+    if (plan !== "starter" && plan !== "pro") {
+      return NextResponse.json(
+        { error: "Invalid plan specified. Supported plans are 'starter' or 'pro'." },
+        { status: 400 }
+      );
+    }
+
+    if (billingPeriod !== "monthly" && billingPeriod !== "annual") {
+      return NextResponse.json(
+        { error: "Invalid billing period specified. Supported options are 'monthly' or 'annual'." },
+        { status: 400 }
+      );
+    }
+
+    // 2.5 Prevent duplicate subscription if already active on requested tier
+    const activeSub = await db.query.subscriptions.findFirst({
+      where: and(
+        eq(subscriptions.userId, user.id),
+        eq(subscriptions.status, "active")
+      ),
+    });
+
+    if (activeSub && activeSub.plan === plan) {
+      return NextResponse.json(
+        { error: `You already have an active ${plan === "pro" ? "Pro" : "Starter"} subscription.` },
+        { status: 400 }
+      );
     }
 
     let productId: string | undefined;

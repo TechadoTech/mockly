@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { auth } from "@/lib/auth";
 import SignOutButton from "./sign-out-button";
 import { db } from "@/db";
-import { mockups } from "@/db/schema";
+import { mockups, exportLogs, subscriptions, users } from "@/db/schema";
 import { and, eq, gte, desc } from "drizzle-orm";
 import { MockupBuilder } from "./mockup-builder";
 import { UserProfileBadge } from "@/components/user-profile-badge";
@@ -36,10 +36,47 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  // 1. Calculate current calendar month usage count
+  // Verify active subscription status if marked as paid
+  let effectivePlan: "free" | "starter" | "pro" = (user.plan as any) || "free";
+  if (effectivePlan !== "free" && user.role !== "admin") {
+    const latestSub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.userId, user.id),
+      orderBy: [desc(subscriptions.createdAt)],
+    });
+
+    if (!latestSub) {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    } else if (
+      (latestSub.status === "cancelled" || latestSub.status === "failed" || latestSub.status === "expired" || latestSub.status === "pending_cancellation" || latestSub.status === "on_hold" || latestSub.status === "paused") &&
+      latestSub.currentPeriodEnd &&
+      new Date(latestSub.currentPeriodEnd) < new Date()
+    ) {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    } else if (latestSub.status !== "active" && latestSub.status !== "pending_cancellation") {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    }
+  }
+
+  // 1. Calculate current calendar month usage count (tamper-proof against mockup deletion)
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
+
+  const monthExportLogs = await db
+    .select()
+    .from(exportLogs)
+    .where(
+      and(
+        eq(exportLogs.userId, user.id),
+        gte(exportLogs.createdAt, startOfMonth)
+      )
+    );
 
   const monthExportsList = await db
     .select()
@@ -50,7 +87,8 @@ export default async function DashboardPage() {
         gte(mockups.createdAt, startOfMonth)
       )
     );
-  const currentMonthUsage = monthExportsList.length;
+
+  const currentMonthUsage = Math.max(monthExportLogs.length, monthExportsList.length);
 
   // 2. Fetch all-time exported mockups history for this user
   const userMockupHistory = await db
@@ -120,7 +158,7 @@ export default async function DashboardPage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <UserProfileBadge user={user} />
+            <UserProfileBadge user={{ ...user, plan: effectivePlan }} />
             <SignOutButton />
           </div>
         </div>
@@ -142,14 +180,14 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-text-semi-muted">Account Tier:</span>
             <span className="text-xs font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-pink-500 text-white px-3.5 py-1 rounded-full shadow-lg shadow-indigo-500/15 select-none">
-              {user.role === "admin" ? "Admin (Free Pro Access)" : user.plan === "pro" ? "Pro Plan" : user.plan === "starter" ? "Starter Plan" : "Free Plan"}
+              {user.role === "admin" ? "Admin (Free Pro Access)" : effectivePlan === "pro" ? "Pro Plan" : effectivePlan === "starter" ? "Starter Plan" : "Free Plan"}
             </span>
           </div>
         </section>
 
         {/* Mockup Sandbox Component */}
         <MockupBuilder 
-          plan={(user.plan as "free" | "starter" | "pro") || "free"} 
+          plan={effectivePlan} 
           initialUsage={currentMonthUsage} 
           initialMockups={serializedMockups} 
           userRole={user.role as "admin" | "user"}

@@ -963,7 +963,14 @@ export default function MarketingPage() {
               </div>
 
               {session ? (
-                session.user.plan === "starter" ? (
+                session.user.role === "admin" ? (
+                  <Link 
+                    href="/dashboard"
+                    className="w-full inline-flex items-center justify-center text-sm font-semibold border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 rounded-xl py-3 active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                  >
+                    Admin Access (Active)
+                  </Link>
+                ) : session.user.plan === "starter" ? (
                   <Link 
                     href="/settings/billing"
                     className="w-full inline-flex items-center justify-center text-sm font-semibold border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 rounded-xl py-3 active:scale-[0.98] transition-all duration-200 cursor-pointer"
@@ -1036,7 +1043,14 @@ export default function MarketingPage() {
               </div>
 
               {session ? (
-                session.user.plan === "pro" ? (
+                session.user.role === "admin" ? (
+                  <Link 
+                    href="/dashboard"
+                    className="w-full inline-flex items-center justify-center text-sm font-semibold border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 rounded-xl py-3 active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                  >
+                    Admin Access (Active)
+                  </Link>
+                ) : session.user.plan === "pro" ? (
                   <Link 
                     href="/settings/billing"
                     className="w-full inline-flex items-center justify-center text-sm font-semibold border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 rounded-xl py-3 active:scale-[0.98] transition-all duration-200 cursor-pointer"

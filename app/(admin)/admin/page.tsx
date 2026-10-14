@@ -17,8 +17,12 @@ export default async function AdminPage() {
     redirect("/sign-in");
   }
 
-  // 2. Enforce Strict Server-Side Role-Based Protection
-  if (session.user.role !== "admin") {
+  // 2. Enforce Strict Server-Side Role-Based Protection against Live DB Record
+  const dbUser = await db.query.user.findFirst({
+    where: eq(user.id, session.user.id),
+  });
+
+  if (!dbUser || dbUser.role !== "admin") {
     redirect("/dashboard");
   }
 

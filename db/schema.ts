@@ -98,3 +98,12 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodEnd: timestamp("current_period_end").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// 7. Export Logs Table (Tracks monthly export usage permanently, independent of deleted saved mockups)
+export const exportLogs = pgTable("export_logs", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

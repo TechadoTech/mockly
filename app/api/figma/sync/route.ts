@@ -290,7 +290,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 3.5 Resolve container nodes (sections, groups, canvas frames) to child screen nodes
-    const { resolvedIds, lastModified } = await resolveNodeIds(fileKey, nodeIds, token, isSharedToken);
+    const { resolvedIds: rawResolvedIds, lastModified } = await resolveNodeIds(fileKey, nodeIds, token, isSharedToken);
+    // Cap to maximum 7 screens per sync to prevent resource exhaustion and serverless timeouts
+    const resolvedIds = rawResolvedIds.slice(0, 7);
 
     const screenshots: Array<{ nodeId: string; url: string; fileId: string }> = [];
     const nodesToRender: string[] = [];

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { mockups, subscriptions } from "@/db/schema";
+import { mockups, subscriptions, exportLogs, users } from "@/db/schema";
 import { and, eq, gte, desc } from "drizzle-orm";
 import { ThemeToggle } from "@/components/theme-toggle";
 import SignOutButton from "../../dashboard/sign-out-button";
@@ -35,10 +35,47 @@ export default async function BillingSettingsPage() {
     redirect("/onboarding");
   }
 
-  // 1. Fetch current month mockup usage count
+  // 1. Fetch the user's latest subscription record & determine effective plan
+  const userSub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.userId, user.id),
+    orderBy: [desc(subscriptions.createdAt)],
+  });
+
+  let effectivePlan: "free" | "starter" | "pro" = (user.plan as any) || "free";
+  if (effectivePlan !== "free" && user.role !== "admin") {
+    if (!userSub) {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    } else if (
+      (userSub.status === "cancelled" || userSub.status === "failed" || userSub.status === "expired" || userSub.status === "pending_cancellation" || userSub.status === "on_hold" || userSub.status === "paused") &&
+      userSub.currentPeriodEnd &&
+      new Date(userSub.currentPeriodEnd) < new Date()
+    ) {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    } else if (userSub.status !== "active" && userSub.status !== "pending_cancellation") {
+      effectivePlan = "free";
+      await db.update(users).set({ plan: "free" }).where(eq(users.id, user.id));
+      user.plan = "free";
+    }
+  }
+
+  // 2. Fetch current month mockup usage count (tamper-proof via exportLogs)
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
+
+  const monthExportLogs = await db
+    .select()
+    .from(exportLogs)
+    .where(
+      and(
+        eq(exportLogs.userId, user.id),
+        gte(exportLogs.createdAt, startOfMonth)
+      )
+    );
 
   const monthExportsList = await db
     .select()
@@ -49,13 +86,8 @@ export default async function BillingSettingsPage() {
         gte(mockups.createdAt, startOfMonth)
       )
     );
-  const currentMonthUsage = monthExportsList.length;
 
-  // 2. Fetch the user's latest subscription record
-  const userSub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.userId, user.id),
-    orderBy: [desc(subscriptions.createdAt)],
-  });
+  const currentMonthUsage = Math.max(monthExportLogs.length, monthExportsList.length);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden transition-colors duration-300">
@@ -112,7 +144,7 @@ export default async function BillingSettingsPage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <UserProfileBadge user={user} />
+            <UserProfileBadge user={{ ...user, plan: effectivePlan }} />
             <SignOutButton />
           </div>
         </div>
@@ -146,7 +178,7 @@ export default async function BillingSettingsPage() {
 
         {/* Billing Client Interface Card */}
         <BillingClient 
-          plan={(user.plan as "free" | "starter" | "pro") || "free"} 
+          plan={effectivePlan} 
           status={userSub ? userSub.status : null} 
           currentPeriodEnd={userSub ? userSub.currentPeriodEnd.toISOString() : null}
           usageCount={currentMonthUsage}
